@@ -1,11 +1,11 @@
-import streamlit as st
+﻿import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import datetime
-import folium
-from streamlit_folium import folium_static  
+from streamlit_folium import folium_static
+import pandas as pd
 
 # Set your API key
 api_key = 'AIzaSyCaWWyNgY0_haGbbao9sB1148AKHaQsvC4'  # Replace with your actual API key
@@ -45,6 +45,13 @@ def get_trending_videos_with_dates(country_code):
         print(f"An HTTP error occurred: {e}")
         return []
 
+# Set page configuration
+st.set_page_config(
+    page_title="Mugare's YouTube Trending Videos Dashboard",
+    page_icon="📺",  # Add your preferred icon here
+    layout="wide"
+)
+
 # Streamlit App
 st.title("Mugare's YouTube Trending Videos Dashboard")
 
@@ -58,38 +65,54 @@ video_data_with_dates = get_trending_videos_with_dates(selected_country)
 for video in video_data_with_dates:
     video['Date Published'] = datetime.datetime.fromisoformat(video['Date Published'].replace('Z', '+00:00'))
 
-# Bar chart
+# Bar chart for views
 st.subheader(f'Bar Chart - Number of Views for Trending Videos in {selected_country}')
-fig_bar, ax_bar = plt.subplots()
-ax_bar.barh([video['Title'] for video in video_data_with_dates], [video['Views'] for video in video_data_with_dates], color='skyblue')
-ax_bar.set_xlabel('Number of Views')
-ax_bar.set_ylabel('Video Title')
-ax_bar.invert_yaxis()
-ax_bar.set_title(f'Trending Videos in {selected_country}')
+fig_bar_views, ax_bar_views = plt.subplots()
+ax_bar_views.barh([video['Title'] for video in video_data_with_dates], [video['Views'] for video in video_data_with_dates], color='skyblue')
+ax_bar_views.set_xlabel('Number of Views')
+ax_bar_views.set_ylabel('Video Title')
+ax_bar_views.invert_yaxis()
+ax_bar_views.set_title(f'Trending Videos in {selected_country} - Views')
 for i, video in enumerate(video_data_with_dates):
-    ax_bar.text(video['Views'], i, str(video['Views']), color='black', va='center')
-st.pyplot(fig_bar)
+    ax_bar_views.text(video['Views'], i, str(video['Views']), color='black', va='center')
+st.pyplot(fig_bar_views)
 
-# Pie chart
-st.subheader(f'Pie Chart - Distribution of Likes for Trending Videos in {selected_country}')
-fig_pie, ax_pie = plt.subplots()
-ax_pie.pie([video['Likes'] for video in video_data_with_dates], labels=[video['Title'] for video in video_data_with_dates], autopct='%1.1f%%', startangle=90)
-ax_pie.axis('equal')
-ax_pie.set_title(f'Trending Videos in {selected_country}')
-st.pyplot(fig_pie)
+# Bar chart for likes
+st.subheader(f'Bar Chart - Number of Likes for Trending Videos in {selected_country}')
+fig_bar_likes, ax_bar_likes = plt.subplots()
+ax_bar_likes.barh([video['Title'] for video in video_data_with_dates], [video['Likes'] for video in video_data_with_dates], color='lightcoral')
+ax_bar_likes.set_xlabel('Number of Likes')
+ax_bar_likes.set_ylabel('Video Title')
+ax_bar_likes.invert_yaxis()
+ax_bar_likes.set_title(f'Trending Videos in {selected_country} - Likes')
+for i, video in enumerate(video_data_with_dates):
+    ax_bar_likes.text(video['Likes'], i, str(video['Likes']), color='black', va='center')
+st.pyplot(fig_bar_likes)
 
-# Time series plot
-st.subheader(f'Time Series Plot - Views Over Time for Trending Videos in {selected_country}')
-fig_time_series, ax_time_series = plt.subplots()
+# Line chart for views and likes over time
+st.subheader(f'Line Chart - Views and Likes Over Time for Trending Videos in {selected_country}')
+fig_line_chart, ax_line_chart = plt.subplots()
 for video in video_data_with_dates:
-    ax_time_series.plot(video['Date Published'], video['Views'], marker='o', label=video['Title'])
+    ax_line_chart.plot(video['Date Published'], video['Views'], marker='o', label=f"{video['Title']} - Views")
+    ax_line_chart.plot(video['Date Published'], video['Likes'], marker='o', label=f"{video['Title']} - Likes")
 
-ax_time_series.set_xlabel('Date Published')
-ax_time_series.set_ylabel('Number of Views')
-ax_time_series.set_title(f'Time Series - Views Over Time')
-ax_time_series.legend(loc='upper left', bbox_to_anchor=(1, 1))
+ax_line_chart.set_xlabel('Date Published')
+ax_line_chart.set_ylabel('Count')
+ax_line_chart.set_title(f'Views and Likes Over Time')
+ax_line_chart.legend(loc='upper left', bbox_to_anchor=(1, 1))
 plt.xticks(rotation=45)
-st.pyplot(fig_time_series)
+st.pyplot(fig_line_chart)
+
+# Summary table
+st.subheader("Summary Table")
+summary_data = {
+    'Title': [video['Title'] for video in video_data_with_dates],
+    'Views': [video['Views'] for video in video_data_with_dates],
+    'Likes': [video['Likes'] for video in video_data_with_dates],
+    'Date Published': [video['Date Published'].strftime("%Y-%m-%d %H:%M:%S") for video in video_data_with_dates]
+}
+summary_df = pd.DataFrame(summary_data)
+st.table(summary_df)
 
 # Video player
 st.subheader("Interactive Video Player")
@@ -101,38 +124,17 @@ video_id = next(video['Video ID'] for video in video_data_with_dates if video['T
 # Embed YouTube video
 st.video(f"https://www.youtube.com/watch?v={video_id}")
 
-# Display the geographical distribution on a map
-st.subheader(f'Geographical Distribution of Trending Videos in {selected_country}')
-m = folium.Map(location=[0, 0], zoom_start=2)
-
-for video in video_data_with_dates:
-    title = video['Title']
-    views = video['Views']
-    likes = video['Likes']
-    date_published = video['Date Published'].strftime("%Y-%m-%d %H:%M:%S")
-    video_url = f"https://www.youtube.com/watch?v={video['Video ID']}"
-
-    # Add a marker for each video
-    folium.Marker(
-        location=[0, 0],  # Replace with actual latitude and longitude data if available
-        popup=f"<strong>Title:</strong> {title}<br><strong>Views:</strong> {views}<br><strong>Likes:</strong> {likes}<br><strong>Date Published:</strong> {date_published}<br><a href='{video_url}' target='_blank'>Watch Video</a>",
-        tooltip=title
-    ).add_to(m)
-
-# Display the map
-folium_static(m)
-
 # Social media sharing buttons
 st.subheader("Share Your Favorite Video:")
-selected_video = st.selectbox("Select a Video to Share", [video['Title'] for video in video_data_with_dates])
+selected_video_share = st.selectbox("Select a Video to Share", [video['Title'] for video in video_data_with_dates])
 
 # Get the video ID for the selected video
-video_id = next(video['Video ID'] for video in video_data_with_dates if video['Title'] == selected_video)
+video_id_share = next(video['Video ID'] for video in video_data_with_dates if video['Title'] == selected_video_share)
 
 # Twitter sharing button
-twitter_url = f"https://twitter.com/intent/tweet?url=https://www.youtube.com/watch?v={video_id}&text=Check%20out%20this%20awesome%20video:%20{selected_video}"
+twitter_url = f"https://twitter.com/intent/tweet?url=https://www.youtube.com/watch?v={video_id_share}&text=Check%20out%20this%20awesome%20video:%20{selected_video_share}"
 st.markdown(f'<a href="{twitter_url}" target="_blank"><img src="https://simplesharebuttons.com/images/somacro/twitter.png" alt="Twitter" width="40"></a>', unsafe_allow_html=True)
 
 # Facebook sharing button
-facebook_url = f"https://www.facebook.com/sharer/sharer.php?u=https://www.youtube.com/watch?v={video_id}&quote=Check%20out%20this%20awesome%20video:%20{selected_video}"
+facebook_url = f"https://www.facebook.com/sharer/sharer.php?u=https://www.youtube.com/watch?v={video_id_share}&quote=Check%20out%20this%20awesome%20video:%20{selected_video_share}"
 st.markdown(f'<a href="{facebook_url}" target="_blank"><img src="https://simplesharebuttons.com/images/somacro/facebook.png" alt="Facebook" width="40"></a>', unsafe_allow_html=True)
